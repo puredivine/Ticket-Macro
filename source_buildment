@@ -1,0 +1,32 @@
+from pytesseract import pytesseract, image_to_string
+from PIL import Image
+import numpy as np
+from PIL import Image
+import cv2
+
+class Buildment:
+    def __init__(self):
+        pytesseract.tesseract_cmd = r'C:\Users\moseg\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
+
+    def captcha_cracker(self, file_path: str):
+        # resize
+        image = cv2.imread(file_path)
+        resized_img = cv2.resize(image, None, fx=2.525, fy=2.525, interpolation=cv2.INTER_CUBIC) # 2.52
+
+        _, binary_image = cv2.threshold(resized_img, 127, 255, cv2.THRESH_BINARY)
+
+        kernel = np.ones((2, 1), np.uint8) 
+        dilated_image = cv2.dilate(binary_image, kernel, iterations=7)
+
+        kernel = np.ones((1, 2), np.uint8)
+        dilated_image = cv2.dilate(dilated_image, kernel, iterations=6)
+
+        kernel = np.ones((3, 3), np.uint8)
+        dilated_image = cv2.erode(dilated_image, kernel, iterations=1)
+
+        cv2.imwrite('final_image.jpg', dilated_image)
+
+        tes_img = Image.open('final_image.jpg')
+        txt = image_to_string(tes_img, config="-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ --psm 13 --oem 3")
+
+        return txt
