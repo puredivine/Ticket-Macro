@@ -1,0 +1,72 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+import keyboard
+from datetime import datetime
+from sys import exit as exit_program
+from buildment import Buildment
+
+from time import sleep
+
+BD = Buildment()
+
+#url = "https://ticket.melon.com/performance/index.htm?prodId=209471"
+captcha_img = 'screenshot.png'
+
+# main driver with port
+option = Options()
+option.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+macro_driver = webdriver.Chrome(options=option)
+
+day = 0
+
+macro_driver.implicitly_wait(5)
+macro_driver.find_elements(By.CLASS_NAME, 'txt')[day].click()
+macro_driver.find_element(By.ID, 'ticketReservation_Btn').click()
+
+keyboard.wait('esc')
+# WebDriverWait(macro_driver, 10).until(EC.number_of_windows_to_be(2))
+
+try:
+    macro_driver.switch_to.window(macro_driver.window_handles[1])
+        
+    # Captcha Cracking
+    for i in range(100):
+        print('i', i)
+        macro_driver.find_element(By.ID, 'captchaImg').screenshot(captcha_img)
+        x = BD.captcha_cracker(captcha_img)
+        macro_driver.find_element(By.CSS_SELECTOR, '#label-for-captcha').send_keys(x, Keys.ENTER)
+        #print(i, x)
+
+        if macro_driver.find_element(By.CSS_SELECTOR, '#errorMessage').is_displayed():
+            print('k')
+            macro_driver.find_element(By.CSS_SELECTOR, '#btnReload').send_keys(Keys.ENTER)
+            macro_driver.find_element(By.CSS_SELECTOR, '#label-for-captcha').clear()
+        else:
+            break
+    
+    # Reservation
+    macro_driver.switch_to.frame('oneStopFrame')
+    macro_driver.find_element(By.CLASS_NAME, 'area_info').click()
+    residuals = macro_driver.find_elements(By.CLASS_NAME, 'seat_residual')
+    for seats_info in residuals:
+        print(seats_info.text[0:-1])
+        if seats_info.text != '0석':
+            seats_info.click()
+
+            break
+
+    macro_driver.find_element(By.XPATH, '/html/body/div/div[1]/div[2]/div[2]/div[1]/div[1]/div[2]/svg/rect[377]').click()
+#ez_canvas > svg > rect:nth-child(137) 
+except Exception as err:
+    print(err)
+    print("EEEEEEEEEEEEERRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOORRRRRRRRRRRRRRRR")
+    macro_driver.close()
+
+
+print('End At', datetime.now())
+exit_program()
