@@ -14,12 +14,13 @@ from time import sleep
 
 
 DAY = ['20240623', '20240523', '20240629'][1]
+MAX_RSV = 1
 FLOOR = [1]
-SPOT = [4]
+SPOT = [12]
 SITE = ['{} 층 {} 구역'.format(FLOOR[k], SPOT[k]) for k in range(len(FLOOR))]
 
 CAPTCHA_IMG = 'screenshot.png'
-captcha_cracker = Buildment().captcha_cracker
+BD = Buildment()
 SCIRPT = """
 var rects = document.getElementsByTagName('rect');
 var result = [];
@@ -36,20 +37,24 @@ return result;
 """
 
 
-# program
+
+
 try:
 
     print('wait for esc to run')
     keyboard.wait('esc') # For test
     print('running')
 
+
+
     # main driver set up #
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
-    # Add later : ignore alerts
+
     macro_driver = webdriver.Chrome(options=chrome_options)
     _wait = lambda sec: WebDriverWait(macro_driver, sec, poll_frequency=0.4)
+
 
 
     # deal with the first window #
@@ -58,7 +63,7 @@ try:
     _wait(10).until(EC.invisibility_of_element((By.CSS_SELECTOR, '#section_time > div > p')))
     macro_driver.find_element(By.CSS_SELECTOR, '#ticketReservation_Btn').click()
 
-    macro_driver.implicitly_wait(5)
+
 
     # deal with the second window #
     _wait(10).until(EC.number_of_windows_to_be(2))
@@ -68,34 +73,50 @@ try:
     print('Pop-up Loaded', '\n')
     
 
+
     # search remain seats #
     #keyboard.wait('esc')
     print('After Captcha')
+    sleep(1) #################################### error 
     macro_driver.switch_to.frame('oneStopFrame')
     
     area_opens = macro_driver.find_elements(By.CLASS_NAME, 'area_info')
     for _area_open in area_opens: _area_open.click()
 
-    site_names = macro_driver.find_elements(By.CLASS_NAME, 'area_tit')
+    site_names = [_name.text for _name in macro_driver.find_elements(By.CLASS_NAME, 'area_tit')]
     residuals = macro_driver.find_elements(By.CLASS_NAME, 'seat_residual')
     site_len = len(site_names)
     
-    for i in range(site_len):
-        if site_names[i].text in SITE:
-            if residuals[i].text != '0석':
+
+
+    # Prior
+    seat_rsv_cnt = 0
+    for _target in SITE:
+        idx = site_names.index(_target)
+        if seat_rsv_cnt >= MAX_RSV: break
+        elif residuals[idx].text != '0석':
+            residuals[idx].click()
+
+            seats = macro_driver.execute_script(SCIRPT)
+            seats[0].click()
+            seat_rsv_cnt += 1
+    
+    # Not Prior
+    if seat_rsv_cnt < MAX_RSV: 
+        for i in range(site_len):
+            if seat_rsv_cnt >= MAX_RSV: break
+            elif residuals[i].text != '0석':
                 residuals[i].click()
 
                 seats = macro_driver.execute_script(SCIRPT)
-                print("length of seats: {}".format(len(seats)))
                 seats[0].click()
-
-                # Final Reservation #
-                reservation_btn = _wait(10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#nextTicketSelection')))
-                reservation_btn.click()
-
-                break
+                seat_rsv_cnt += 1
+                
 
     
+    # Final Reservation #
+    reservation_btn = _wait(10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#nextTicketSelection')))
+    reservation_btn.click()
 
     _wait(10).until(EC.alert_is_present())
     macro_driver.switch_to.alert.accept()
