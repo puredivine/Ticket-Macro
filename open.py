@@ -13,65 +13,101 @@ from buildment import Buildment
 from time import sleep
 
 
-day = ['20240623', '20240523', '20240629'][2]
-captcha_img = 'screenshot.png'
+DAY = ['20240623', '20240523', '20240629'][1]
+FLOOR = [1]
+SPOT = [4]
+SITE = ['{} 층 {} 구역'.format(FLOOR[k], SPOT[k]) for k in range(len(FLOOR))]
 
+CAPTCHA_IMG = 'screenshot.png'
+captcha_cracker = Buildment().captcha_cracker
+SCIRPT = """
+var rects = document.getElementsByTagName('rect');
+var result = [];
+for (var i = 0; i < rects.length; i++) {
+    var rect = rects[i];
+    var color = rect.getAttribute("fill");
+    var width = rect.getAttribute("width");
+    var height = rect.getAttribute("height");
+    if (width == 11 && height == 11 && color !== '#DDDDDD') {
+        result.push(rect);
+    }
+}
+return result;
+"""
+
+
+# program
 try:
-    read_capt = Buildment().captcha_cracker
 
     print('wait for esc to run')
     keyboard.wait('esc') # For test
     print('running')
 
     # main driver set up #
-    option = Options()
-    option.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
     # Add later : ignore alerts
-    macro_driver = webdriver.Chrome(options=option)
-    _wait = lambda sec: WebDriverWait(macro_driver, sec, poll_frequency=0.5)
+    macro_driver = webdriver.Chrome(options=chrome_options)
+    _wait = lambda sec: WebDriverWait(macro_driver, sec, poll_frequency=0.4)
 
 
     # deal with the first window #
-    date = _wait(100).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#dateSelect_{} > button > span'.format(day))))
+    date = _wait(100).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#dateSelect_{} > button > span'.format(DAY))))
     date.click()
     _wait(10).until(EC.invisibility_of_element((By.CSS_SELECTOR, '#section_time > div > p')))
     macro_driver.find_element(By.CSS_SELECTOR, '#ticketReservation_Btn').click()
 
+    macro_driver.implicitly_wait(5)
 
     # deal with the second window #
     _wait(10).until(EC.number_of_windows_to_be(2))
     macro_driver.switch_to.window(macro_driver.window_handles[1])
     
-    ##################################################################
     _wait(10).until(lambda driver: driver.execute_script('return document.readyState;') == 'complete')
-    print('Loaded')
+    print('Pop-up Loaded', '\n')
+    
 
+    # search remain seats #
+    #keyboard.wait('esc')
+    print('After Captcha')
+    macro_driver.switch_to.frame('oneStopFrame')
+    
+    area_opens = macro_driver.find_elements(By.CLASS_NAME, 'area_info')
+    for _area_open in area_opens: _area_open.click()
 
-    Captcha = macro_driver.execute_script('''return document.querySelector("#certification > div.la_header > div > h3")''')
-    print(Captcha)
-    print('Captcha', Captcha != None)
+    site_names = macro_driver.find_elements(By.CLASS_NAME, 'area_tit')
+    residuals = macro_driver.find_elements(By.CLASS_NAME, 'seat_residual')
+    site_len = len(site_names)
+    
+    for i in range(site_len):
+        if site_names[i].text in SITE:
+            if residuals[i].text != '0석':
+                residuals[i].click()
 
-    if Captcha != None:
-        # Captcha Cracking
-        for i in range(1, 100):
-            macro_driver.find_element(By.ID, 'captchaImg').screenshot(captcha_img)
-            x = read_capt(captcha_img)
-            macro_driver.find_element(By.CSS_SELECTOR, '#label-for-captcha').send_keys(x, Keys.ENTER)
-            print('captcha try :', i)
+                seats = macro_driver.execute_script(SCIRPT)
+                print("length of seats: {}".format(len(seats)))
+                seats[0].click()
 
-            print(macro_driver.execute_script('return document.readyState;'))
-            if macro_driver.find_element(By.CSS_SELECTOR, '#errorMessage').is_displayed():
-                macro_driver.find_element(By.CSS_SELECTOR, '#btnReload').send_keys(Keys.ENTER)
-                macro_driver.find_element(By.CSS_SELECTOR, '#label-for-captcha').clear()
-            else:
+                # Final Reservation #
+                reservation_btn = _wait(10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#nextTicketSelection')))
+                reservation_btn.click()
+
                 break
-        print("Captcha cracked")
 
+    
 
+    _wait(10).until(EC.alert_is_present())
+    macro_driver.switch_to.alert.accept()
 
+    # EXIT PROGRAM #
     _exit('Successfully End At {}'.format(datetime.now()))
 
 # print('captcha broke')
-except KeyboardInterrupt:
-    raise Exception('==========================KeyboardInterrupt=========================')
+except Exception as EXC:
+    if EXC is KeyboardInterrupt:
+        raise Exception('==========================KeyboardInterrupt=========================')
+    else:
+        raise Exception(EXC)
     _exit('End At {}'.format(datetime.now()))
+    
