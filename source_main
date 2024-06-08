@@ -4,69 +4,72 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.alert import Alert
 
-import keyboard
+from keyboard import wait as keyboard_wait
 from datetime import datetime
-from sys import exit as exit_program
-from buildment import Buildment
-
+from sys import exit as _exit
 from time import sleep
 
-BD = Buildment()
+from bs4 import BeautifulSoup
 
-#url = "https://ticket.melon.com/performance/index.htm?prodId=209471"
-captcha_img = 'screenshot.png'
+DAY = ['20240803', '20240707'][0]
+TIME = 1
+TARGET = [
+    (2, 4),
+    (2, 5)
+]
+SITE = ['{} 층 {} 구역'.format(_set[0], _set[1]) for _set in TARGET]
 
-# main driver with port
-option = Options()
-option.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
-macro_driver = webdriver.Chrome(options=option)
-
-day = 0
-
-macro_driver.implicitly_wait(5)
-macro_driver.find_elements(By.CLASS_NAME, 'txt')[day].click()
-macro_driver.find_element(By.ID, 'ticketReservation_Btn').click()
-
-keyboard.wait('esc')
-# WebDriverWait(macro_driver, 10).until(EC.number_of_windows_to_be(2))
 
 try:
-    macro_driver.switch_to.window(macro_driver.window_handles[1])
-        
-    # Captcha Cracking
-    for i in range(100):
-        print('i', i)
-        macro_driver.find_element(By.ID, 'captchaImg').screenshot(captcha_img)
-        x = BD.captcha_cracker(captcha_img)
-        macro_driver.find_element(By.CSS_SELECTOR, '#label-for-captcha').send_keys(x, Keys.ENTER)
-        #print(i, x)
+    # Set Driver #
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
 
-        if macro_driver.find_element(By.CSS_SELECTOR, '#errorMessage').is_displayed():
-            print('k')
-            macro_driver.find_element(By.CSS_SELECTOR, '#btnReload').send_keys(Keys.ENTER)
-            macro_driver.find_element(By.CSS_SELECTOR, '#label-for-captcha').clear()
-        else:
-            break
+    macro_driver = webdriver.Chrome(options=chrome_options)
+    _wait = lambda sec: WebDriverWait(macro_driver, sec, poll_frequency=0.4)
+    # Set Driver #
+
+
+
+    print('wait for esc to run')
+    keyboard_wait('esc') # For test
+    print('running')
+    start_time = datetime.now()
+
+
+
+    # deal with the first window #
+    btn_list = _wait(100).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#ticketing_process_box > div > div.box_ticketing_process > dl.date_choice > dd.sorting > button.type_list')))
+    btn_list.click()
+    btn_date = _wait(10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#dateSelect_{} > button > span'.format(DAY))))
+    btn_date.click()
+
+    btn_time = _wait(10).until(EC.visibility_of_element_located((By.XPATH, '//*[@id="list_time"]/li[{}]/button'.format(TIME))))
+    btn_time.click()
+    btn_reservation = _wait(10).until(EC.element_to_be_clickable((By.ID,'ticketReservation_Btn')))
+    btn_reservation.click()
+    # deal with the first window #
     
-    # Reservation
-    macro_driver.switch_to.frame('oneStopFrame')
-    macro_driver.find_element(By.CLASS_NAME, 'area_info').click()
-    residuals = macro_driver.find_elements(By.CLASS_NAME, 'seat_residual')
-    for seats_info in residuals:
-        print(seats_info.text[0:-1])
-        if seats_info.text != '0석':
-            seats_info.click()
-
-            break
-
-    macro_driver.find_element(By.XPATH, '/html/body/div/div[1]/div[2]/div[2]/div[1]/div[1]/div[2]/svg/rect[377]').click()
-#ez_canvas > svg > rect:nth-child(137) 
-except Exception as err:
-    print(err)
-    print("EEEEEEEEEEEEERRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOORRRRRRRRRRRRRRRR")
-    macro_driver.close()
 
 
-print('End At', datetime.now())
-exit_program()
+    # deal with the second window #
+    _wait(10).until(EC.number_of_windows_to_be(2))
+    macro_driver.switch_to.window(macro_driver.window_handles[1])
+
+    _wait(10).until(lambda driver: driver.execute_script('return document.readyState;') == 'complete')
+
+    soup = BeautifulSoup(macro_driver.page_source, 'html.parser')
+    captcha_exist = False if soup.find('div', id='certification') == None else True
+
+    print(captcha_exist)
+
+except KeyboardInterrupt:
+    raise KeyboardInterrupt
+
+except Exception as ERROR:
+    raise ERROR
+
+finally:
+    _exit('EndTime: {}      RunTime: {}'.format(datetime.now(), datetime.now()-start_time))
