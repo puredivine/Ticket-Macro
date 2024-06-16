@@ -1,0 +1,206 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.alert import Alert
+
+from keyboard import wait as keyboard_wait
+from datetime import datetime
+from time import sleep
+
+import numpy as np
+import pytesseract
+from PIL import Image
+import cv2
+
+def captcha_cracker(image_path: str):
+    # resize
+    image = cv2.imread(image_path)
+    resized_img = cv2.resize(image, None, fx=2.525, fy=2.525, interpolation=cv2.INTER_CUBIC) # 2.52
+
+    _, binary_image = cv2.threshold(resized_img, 127, 255, cv2.THRESH_BINARY)
+
+    kernel = np.ones((2, 1), np.uint8) 
+    dilated_image = cv2.dilate(binary_image, kernel, iterations=7)
+
+    kernel = np.ones((1, 2), np.uint8)
+    dilated_image = cv2.dilate(dilated_image, kernel, iterations=6)
+
+    kernel = np.ones((3, 3), np.uint8)
+    dilated_image = cv2.erode(dilated_image, kernel, iterations=1)
+
+    cv2.imwrite('final_image.jpg', dilated_image)
+
+    tes_img = Image.open('final_image.jpg')
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Users\moseg\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
+    txt = pytesseract.image_to_string(tes_img, config="-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ --psm 13 --oem 3")
+
+    return txt
+
+
+def macro_main(DAY: str, TIME: int, TIME_NAME: str, SITE: list[str] = None, pf: float = 0.4):
+
+    # Set Driver #
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+
+    macro_driver = webdriver.Chrome(options=chrome_options)
+    _wait = lambda sec: WebDriverWait(macro_driver, sec, poll_frequency=pf)
+
+    # macro_driver.set_page_load_timeout(0.5)
+    # Set Driver #
+
+
+
+    print('ESC..')
+    keyboard_wait('esc') # For test
+    print('..ESC')
+    start_time = datetime.now()
+
+
+
+    # deal with the first window #
+    btn_list = _wait(100).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#ticketing_process_box > div > div.box_ticketing_process > dl.date_choice > dd.sorting > button.type_list')))
+    btn_list.click()
+    btn_date = _wait(10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#dateSelect_{} > button > span'.format(DAY))))
+    btn_date.click()
+
+    btn_time = _wait(10).until(EC.all_of(
+        EC.text_to_be_present_in_element((By.XPATH, '//*[@id="list_time"]/li[{}]/button'.format(TIME)), TIME_NAME)), ###################
+        EC.element_to_be_clickable((By.XPATH, '//*[@id="list_time"]/li[{}]/button'.format(TIME))))
+    # btn_time.click()
+    btn_reservation = _wait(10).until(EC.element_to_be_clickable((By.ID,'ticketReservation_Btn')))
+    btn_reservation.click()
+    # deal with the first window #
+
+
+
+    # deal with the second window #
+    _wait(1000).until(EC.number_of_windows_to_be(2))
+    windows = macro_driver.window_handles
+    macro_driver.switch_to.window(windows[1])
+    print('New Window')
+
+
+    _wait(10).until(lambda driver: driver.execute_script('return document.readyState;') == 'complete')
+    _wait(10).until(lambda driver: driver.execute_script("return typeof jQuery != 'undefined'"))
+    _wait(10).until(lambda driver: driver.execute_script("return jQuery.active == 0"))
+    print('Loaded')
+
+    captcha_pres = False if macro_driver.page_source.find('id="certification"') == -1 else True
+
+
+    print('Captcha:', captcha_pres)
+    # Captcha Craking #
+    # if captcha_pres:
+    #     for i in range(100):
+    #         print('try:', i)
+    #         macro_driver.find_element(By.ID, 'captchaImg').screenshot('captcha.png')
+    #         x = captcha_cracker('captcha.png')
+    #         macro_driver.find_element(By.CSS_SELECTOR, '#label-for-captcha').send_keys(x, Keys.ENTER)
+
+    #         if macro_driver.find_element(By.CSS_SELECTOR, '#errorMessage').is_displayed():
+    #             try:
+    #                 macro_driver.find_element(By.CSS_SELECTOR, '#btnReload').click()
+    #                 macro_driver.find_element(By.CSS_SELECTOR, '#label-for-captcha').clear()
+    #             except:
+    #                 break
+    #         else:
+    #             break
+
+
+    keyboard_wait('esc')
+
+    # Reservation #
+    macro_driver.switch_to.frame('oneStopFrame')
+    
+    area_opens = macro_driver.find_elements(By.CLASS_NAME, 'area_info')
+    for _area_open in area_opens:
+        _wait(10).until(EC.element_to_be_clickable(_area_open)).click()
+
+    site_names = [_name.text for _name in macro_driver.find_elements(By.CLASS_NAME, 'area_tit')]
+    residuals = macro_driver.find_elements(By.CLASS_NAME, 'seat_residual')
+    site_len = len(site_names)
+
+    filtered = []
+
+    ##################################################### SLOWWWWWWWWWWWWWWWWWW ###############################
+    for idx in range(site_len):
+        if residuals[idx].text != '0석':
+            if site_names[idx] in SITE:
+                filtered.insert(0, residuals[idx])
+            else:
+                filtered.append(residuals[idx])
+    ##################################################### SLOWWWWWWWWWWWWWWWWWW ###############################
+    NO_SEAT = True
+
+    for _site in filtered:
+        _wait(10).until(EC.visibility_of_element_located((By.CLASS_NAME, 'area_info')))
+        if not ('open' in area_opens[0].get_attribute('class')):
+            for _area_open in area_opens:
+                _wait(10).until(EC.element_to_be_clickable(_area_open)).click()
+
+        if NO_SEAT:
+            _site.click()
+
+            while True:
+                top_seat = macro_driver.execute_script('''
+                                                var rects = document.getElementsByTagName('rect');
+                                                var minY = Number.POSITIVE_INFINITY;
+                                                var minYRect = null;
+                                                for (var i = 0; i < rects.length; i++) {
+                                                    var rect = rects[i];
+                                                    var color = rect.getAttribute("fill");
+                                                    var width = rect.getAttribute("width");
+                                                    var height = rect.getAttribute("height");
+                                                    if ((width == 11 && height == 11) && color !== '#DDDDDD') {
+                                                        if (rect.getAttribute('y') < minY) {
+                                                            minY = rect.getAttribute('y');
+                                                            minYRect = rect;
+                                                        }
+                                                    }
+                                                }
+                                                return minYRect;''')
+                
+                print(top_seat)
+                if top_seat == None:
+                    break
+                
+                top_seat.click()
+                sleep(2)
+                reservation_btn = _wait(10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#nextTicketSelection')))
+                reservation_btn.click()
+
+                alert_pres = True
+                try: macro_driver.switch_to.alert.accept()
+                except: alert_pres = False
+                
+                if alert_pres:
+                    continue
+                else:
+                    NO_SEAT = False
+                    break
+
+        if not NO_SEAT:
+            break
+
+
+        # try:
+        #     macro_driver.switch_to.alert.accept()
+        #     #seats[1].pop(miny_idx)
+        #     _wait(10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#nextTicketSelection')))
+        #     for _area_open in list(area_opens): _area_open.click()
+        #     continue
+        # except:
+        #     break
+
+    # Reservation #
+
+    # EXCEPTION HANDLE #
+    # EXCEPTION HANDLE #
+
+    print('EndTime: {}      RunTime: {}'.format(datetime.now(), datetime.now()-start_time))
+
+    return 0
