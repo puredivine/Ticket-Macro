@@ -1,0 +1,104 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+from datetime import datetime
+from time import sleep
+
+print('Check The Interpreter\n'*5)
+
+'''
+06:00 ~ 8:00        1
+08:00 ~ 10:00       2
+10:00 ~ 12:00       3
+12:00 ~ 14:00       4
+14:00 ~ 16:00       5
+16:00 ~ 18:00       6
+18:00 ~ 20:00       7
+20:00 ~ 22:00       8
+'''
+
+poll = 0.9
+day = 24
+time = [4, 7, 8, 6][::-1]
+
+print("Day: {}".format(day))
+print("Time: {}".format(time))
+print('#'*20 + 'CHECK THE DOCX', '#'*20)
+print('#'*20 + 'CHECK THE DOCX', '#'*20)
+print('#'*20 + 'CHECK THE DOCX', '#'*20)
+
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+
+driver = webdriver.Chrome(options=chrome_options)
+_wait = lambda sec: WebDriverWait(driver, sec, poll_frequency=poll)
+driver.implicitly_wait(10)
+print(driver.execute_script('return document.readyState;'))
+
+print('After setting driver, Wait for 9')
+driver.refresh()
+
+while True:
+    NOW = datetime.now()
+    if (NOW.hour == 9):
+        driver.refresh()
+        print('fr')
+        break
+
+while True:
+    day_buttons = _wait(30).until(EC.visibility_of_all_elements_located((By.CLASS_NAME, 'tblBtn')))
+
+    _wait(30).until(EC.element_to_be_clickable(day_buttons[day-1])).click()
+    try:
+        _wait(1.5).until(EC.alert_is_present())
+        driver.switch_to.alert.accept()
+        driver.refresh()
+        continue
+    except:
+        print('b')
+        break
+
+_wait(30).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#listForm > p'))).click(); sleep(0.7)
+
+_wait(30).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#listForm > div.btnGroup > span.btn.themeBtn'))).click(); sleep(0.7)
+
+
+
+sleep(1.5)
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'rent_club_nm'))).send_keys('분당중 축구')
+
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'rent_mobile2'))).send_keys('8583')
+
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'rent_mobile3'))).send_keys('0807')
+
+sleep(1)
+
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'rent_amount'))).send_keys('20')
+
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'rent_ceo_nm'))).send_keys('김현우')
+
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'rent_ceo_mobile2'))).send_keys('8583')
+
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'rent_ceo_mobile3'))).send_keys('0807')
+
+sleep(1)
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'uploadFile1'))).send_keys(r'C:\Users\werpi\Desktop\workspace\play_ground\maroo\marooplan.docx')
+
+_wait(30).until(EC.element_to_be_clickable((By.NAME, 'uploadFile2'))).send_keys(r'C:\Users\werpi\Desktop\workspace\play_ground\maroo\maroolist.docx')
+
+time_buttons = _wait(30).until(EC.visibility_of_all_elements_located((By.NAME, 'rent_time_gbn')))
+
+for _t in time:
+    # _wait(1).until(EC.element_to_be_clickable(time_buttons[_t-1])).click()
+    time_buttons[_t-1].click()
+    # sleep(1)
+
+_wait(30).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#contents > p'))).click()
+
+_wait(30).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#contents > div.btnGroup > span.btn.themeBtn.commit'))).click()
+
+_wait(1.5).until(EC.alert_is_present())
+driver.switch_to.alert.accept()
